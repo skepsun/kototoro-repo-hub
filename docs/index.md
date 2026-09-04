@@ -14,12 +14,6 @@ hero:
       link: /how-to-add
 ---
 
-::: warning Legal notice
-This site is an independent community-maintained directory. It is not part of the
-Kototoro application, and the Kototoro developers do not host, bundle, curate, or
-recommend any third-party content repository. Everything below is user-maintained.
-:::
-
 ## Repositories
 
 Click **Install** on any card. If Kototoro is installed on this device, it will open
