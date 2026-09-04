@@ -18,6 +18,8 @@ docs/.vitepress/repo-catalog.ts
   name: "Example Repo",
   url: "https://example.com/index.min.json",
   note: "Optional note shown on the card",
+  contentTypes: ["MANGA"],
+  languages: ["English", "Japanese"],
 },
 ```
 
@@ -35,7 +37,11 @@ docs/.vitepress/repo-catalog.ts
 | `TVBOX` | TVBox source lists |
 | `TSUNDOKU` | Tsundoku novel extension repositories |
 
-4. The site generates an **Install** link automatically:
+4. `contentTypes` is one or more of `MANGA`, `NOVEL`, `VIDEO`.
+5. `languages` is one or more of the language labels used on the site, e.g.
+   `English`, `Chinese`, `Japanese`, `French`, `Turkish`, `Multilingual`.
+
+The site generates an **Install** link automatically:
 
 ```
 kototoro://add-repo?url=<encoded-url>&kind=<KIND>
@@ -56,8 +62,7 @@ Push to the `main` branch. The GitHub Actions workflow in
 `.github/workflows/deploy-pages.yml` builds the site and publishes it to GitHub Pages.
 Set the repository's GitHub Pages source to **GitHub Actions**.
 
-## Legal note
+## Maintenance notes
 
-Keep this directory community-maintained and factual. Do not list illegal content
-repositories. If you receive a valid takedown request, remove the entry and open a
-pull request with the change.
+Keep entries factual and up to date. If a repository stops working or no longer
+resolves, remove it or open a pull request with the fix.

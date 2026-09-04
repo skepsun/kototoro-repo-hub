@@ -26,10 +26,35 @@ const kindLabels: Record<string, string> = {
   TVBOX: "TVBox sources",
 };
 
+const typeLabels: Record<string, string> = {
+  MANGA: "Manga",
+  NOVEL: "Novel",
+  VIDEO: "Video",
+};
+
+const languagePriority = [
+  "Multilingual",
+  "English",
+  "Chinese",
+  "Japanese",
+  "Korean",
+  "French",
+  "Italian",
+  "Turkish",
+  "Hindi",
+  "Bengali",
+  "Indonesian",
+  "Ukrainian",
+];
+
+const query = ref("");
 const activeKind = ref<string>("ALL");
+const typeFilter = ref<string>("ALL");
+const nsfwFilter = ref<string>("ALL");
+const languageFilter = ref<string>("ALL");
 const copiedKey = ref<string | null>(null);
 
-const groups = computed(() => {
+const allGroups = computed(() => {
   const byKind = new Map<string, RepoEntry[]>();
   for (const repo of repos) {
     const list = byKind.get(repo.kind) ?? [];
@@ -45,22 +70,71 @@ const groups = computed(() => {
     }));
 });
 
-const chips = computed(() => {
+const kindChips = computed(() => {
   const total = repos.length;
-  const all = { kind: "ALL", label: "All repositories", count: total };
-  const rest = groups.value.map((group) => ({
+  const rest = allGroups.value.map((group) => ({
     kind: group.kind,
     label: group.label,
     count: group.items.length,
   }));
-  return [all, ...rest];
+  return [{ kind: "ALL", label: "All repositories", count: total }, ...rest];
 });
 
-const visibleGroups = computed(() => {
-  if (activeKind.value === "ALL") {
-    return groups.value;
+const languageOptions = computed(() => {
+  const present = new Set<string>();
+  for (const repo of repos) {
+    for (const language of repo.languages) {
+      present.add(language);
+    }
   }
-  return groups.value.filter((group) => group.kind === activeKind.value);
+  const sorted = [...present].sort((a, b) => {
+    const ai = languagePriority.indexOf(a);
+    const bi = languagePriority.indexOf(b);
+    const ao = ai === -1 ? languagePriority.length : ai;
+    const bo = bi === -1 ? languagePriority.length : bi;
+    return ao - bo || a.localeCompare(b);
+  });
+  return sorted;
+});
+
+function matchesRepo(repo: RepoEntry): boolean {
+  const q = query.value.trim().toLowerCase();
+  if (q) {
+    const haystack = `${repo.name} ${repo.url} ${repo.note ?? ""} ${repo.kind}`.toLowerCase();
+    if (!haystack.includes(q)) {
+      return false;
+    }
+  }
+
+  if (typeFilter.value !== "ALL" && !repo.contentTypes.includes(typeFilter.value)) {
+    return false;
+  }
+
+  if (nsfwFilter.value === "SFW" && repo.nsfw) {
+    return false;
+  }
+  if (nsfwFilter.value === "NSFW" && !repo.nsfw) {
+    return false;
+  }
+
+  if (languageFilter.value !== "ALL" && !repo.languages.includes(languageFilter.value)) {
+    return false;
+  }
+
+  return true;
+}
+
+const visibleGroups = computed(() => {
+  const groups = activeKind.value === "ALL"
+    ? allGroups.value
+    : allGroups.value.filter((group) => group.kind === activeKind.value);
+
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(matchesRepo),
+    }))
+    .filter((group) => group.items.length > 0);
 });
 
 const visibleCount = computed(() => {
@@ -116,9 +190,50 @@ async function copyUrl(repo: RepoEntry) {
 
 <template>
   <div class="repo-dir">
+    <div class="repo-controls">
+      <input
+        v-model="query"
+        type="search"
+        class="repo-search"
+        placeholder="Search by repository name, URL, or keyword..."
+        aria-label="Search repositories"
+      />
+
+      <div class="repo-selects">
+        <label class="repo-select">
+          <span>Type</span>
+          <select v-model="typeFilter">
+            <option value="ALL">All types</option>
+            <option value="MANGA">Manga</option>
+            <option value="NOVEL">Novel</option>
+            <option value="VIDEO">Video</option>
+          </select>
+        </label>
+
+        <label class="repo-select">
+          <span>NSFW</span>
+          <select v-model="nsfwFilter">
+            <option value="ALL">All</option>
+            <option value="SFW">SFW only</option>
+            <option value="NSFW">18+ only</option>
+          </select>
+        </label>
+
+        <label class="repo-select">
+          <span>Language</span>
+          <select v-model="languageFilter">
+            <option value="ALL">All languages</option>
+            <option v-for="language in languageOptions" :key="language" :value="language">
+              {{ language }}
+            </option>
+          </select>
+        </label>
+      </div>
+    </div>
+
     <div class="repo-toolbar" aria-label="Repository type filter">
       <button
-        v-for="chip in chips"
+        v-for="chip in kindChips"
         :key="chip.kind"
         type="button"
         class="repo-chip"
@@ -133,6 +248,14 @@ async function copyUrl(repo: RepoEntry) {
     <p class="repo-summary">
       Showing <strong>{{ visibleCount }}</strong> repositories
       <template v-if="activeKind !== 'ALL'"> in {{ kindLabels[activeKind] ?? activeKind }}</template>
+      <template v-if="typeFilter !== 'ALL'"> · {{ typeLabels[typeFilter] }}</template>
+      <template v-if="nsfwFilter !== 'ALL'"> · {{ nsfwFilter }}</template>
+      <template v-if="languageFilter !== 'ALL'"> · {{ languageFilter }}</template>
+      <template v-if="query.trim()"> · matching “{{ query.trim() }}”</template>
+    </p>
+
+    <p v-if="visibleCount === 0" class="repo-empty">
+      No repositories match the current filters.
     </p>
 
     <section v-for="group in visibleGroups" :key="group.kind" class="repo-section">
@@ -151,6 +274,16 @@ async function copyUrl(repo: RepoEntry) {
           </div>
 
           <h4 class="repo-name">{{ repo.name }}</h4>
+
+          <div class="repo-meta">
+            <span v-for="type in repo.contentTypes" :key="type" class="repo-meta-tag">
+              {{ typeLabels[type] ?? type }}
+            </span>
+            <span v-for="language in repo.languages" :key="language" class="repo-meta-tag language">
+              {{ language }}
+            </span>
+          </div>
+
           <p v-if="repo.note" class="repo-note">{{ repo.note }}</p>
 
           <div class="repo-url-row">
@@ -177,6 +310,51 @@ async function copyUrl(repo: RepoEntry) {
 <style scoped>
 .repo-dir {
   margin-top: 0.25rem;
+}
+
+.repo-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.repo-search {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  font-size: 0.9rem;
+}
+
+.repo-search:focus {
+  outline: none;
+  border-color: var(--vp-c-brand-1);
+}
+
+.repo-selects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.repo-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--vp-c-text-2);
+}
+
+.repo-select select {
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  font-size: 0.82rem;
 }
 
 .repo-toolbar {
@@ -232,6 +410,12 @@ async function copyUrl(repo: RepoEntry) {
   margin: 0.5rem 0 1rem;
   font-size: 0.9rem;
   color: var(--vp-c-text-2);
+}
+
+.repo-empty {
+  padding: 1.5rem 0;
+  text-align: center;
+  color: var(--vp-c-text-3);
 }
 
 .repo-section {
@@ -323,6 +507,25 @@ async function copyUrl(repo: RepoEntry) {
   line-height: 1.35;
 }
 
+.repo-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.repo-meta-tag {
+  font-size: 0.7rem;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  background: var(--vp-c-bg-alt);
+  color: var(--vp-c-text-2);
+}
+
+.repo-meta-tag.language {
+  color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+}
+
 .repo-note {
   margin: 0;
   font-size: 0.8rem;
@@ -402,6 +605,19 @@ async function copyUrl(repo: RepoEntry) {
 @media (max-width: 640px) {
   .repo-grid {
     grid-template-columns: 1fr;
+  }
+
+  .repo-selects {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .repo-select {
+    justify-content: space-between;
+  }
+
+  .repo-select select {
+    flex: 1;
   }
 
   .repo-url-row {
