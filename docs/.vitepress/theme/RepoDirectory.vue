@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useData } from "vitepress";
 import { repos, type RepoEntry } from "../repo-catalog";
+
+const { lang } = useData();
+const isZh = computed(() => lang.value.startsWith("zh"));
 
 const kindOrder = [
   "JAR",
@@ -14,7 +18,7 @@ const kindOrder = [
   "TVBOX",
 ] as const;
 
-const kindLabels: Record<string, string> = {
+const kindLabelsEn: Record<string, string> = {
   JAR: "Kototoro parser jars",
   MIHON: "Mihon / Tachiyomi",
   ANIYOMI: "Aniyomi",
@@ -26,10 +30,43 @@ const kindLabels: Record<string, string> = {
   TVBOX: "TVBox sources",
 };
 
-const typeLabels: Record<string, string> = {
+const kindLabelsZh: Record<string, string> = {
+  JAR: "Kototoro 解析器 JAR",
+  MIHON: "Mihon / Tachiyomi",
+  ANIYOMI: "Aniyomi",
+  IREADER: "IReader",
+  TSUNDOKU: "Tsundoku 小说",
+  CLOUDSTREAM: "CloudStream 源仓库",
+  LNREADER: "LNReader 插件",
+  LEGADO: "Legado 书源",
+  TVBOX: "TVBox 源",
+};
+
+const typeLabelsEn: Record<string, string> = {
   MANGA: "Manga",
   NOVEL: "Novel",
   VIDEO: "Video",
+};
+
+const typeLabelsZh: Record<string, string> = {
+  MANGA: "漫画",
+  NOVEL: "小说",
+  VIDEO: "视频",
+};
+
+const languageLabelsZh: Record<string, string> = {
+  Multilingual: "多语言",
+  English: "英语",
+  Chinese: "中文",
+  Japanese: "日语",
+  Korean: "韩语",
+  French: "法语",
+  Italian: "意大利语",
+  Turkish: "土耳其语",
+  Hindi: "印地语",
+  Bengali: "孟加拉语",
+  Indonesian: "印尼语",
+  Ukrainian: "乌克兰语",
 };
 
 const languagePriority = [
@@ -54,6 +91,22 @@ const nsfwFilter = ref<string>("ALL");
 const languageFilter = ref<string>("ALL");
 const copiedKey = ref<string | null>(null);
 
+function tr(en: string, zh: string): string {
+  return isZh.value ? zh : en;
+}
+
+function kindLabel(kind: string): string {
+  return isZh.value ? (kindLabelsZh[kind] ?? kind) : (kindLabelsEn[kind] ?? kind);
+}
+
+function typeLabel(type: string): string {
+  return isZh.value ? (typeLabelsZh[type] ?? type) : (typeLabelsEn[type] ?? type);
+}
+
+function languageLabel(language: string): string {
+  return isZh.value ? (languageLabelsZh[language] ?? language) : language;
+}
+
 const allGroups = computed(() => {
   const byKind = new Map<string, RepoEntry[]>();
   for (const repo of repos) {
@@ -65,7 +118,7 @@ const allGroups = computed(() => {
     .filter((kind) => byKind.has(kind))
     .map((kind) => ({
       kind,
-      label: kindLabels[kind] ?? kind,
+      label: kindLabel(kind),
       items: byKind.get(kind) ?? [],
     }));
 });
@@ -77,7 +130,10 @@ const kindChips = computed(() => {
     label: group.label,
     count: group.items.length,
   }));
-  return [{ kind: "ALL", label: "All repositories", count: total }, ...rest];
+  return [
+    { kind: "ALL", label: tr("All repositories", "全部仓库"), count: total },
+    ...rest,
+  ];
 });
 
 const languageOptions = computed(() => {
@@ -195,43 +251,43 @@ async function copyUrl(repo: RepoEntry) {
         v-model="query"
         type="search"
         class="repo-search"
-        placeholder="Search by repository name, URL, or keyword..."
-        aria-label="Search repositories"
+        :placeholder="tr('Search by repository name, URL, or keyword...', '按仓库名称、URL 或关键词搜索...')"
+        :aria-label="tr('Search repositories', '搜索仓库')"
       />
 
       <div class="repo-selects">
         <label class="repo-select">
-          <span>Type</span>
+          <span>{{ tr("Type", "类型") }}</span>
           <select v-model="typeFilter">
-            <option value="ALL">All types</option>
-            <option value="MANGA">Manga</option>
-            <option value="NOVEL">Novel</option>
-            <option value="VIDEO">Video</option>
+            <option value="ALL">{{ tr("All types", "全部类型") }}</option>
+            <option value="MANGA">{{ typeLabel("MANGA") }}</option>
+            <option value="NOVEL">{{ typeLabel("NOVEL") }}</option>
+            <option value="VIDEO">{{ typeLabel("VIDEO") }}</option>
           </select>
         </label>
 
         <label class="repo-select">
           <span>NSFW</span>
           <select v-model="nsfwFilter">
-            <option value="ALL">All</option>
-            <option value="SFW">SFW only</option>
-            <option value="NSFW">18+ only</option>
+            <option value="ALL">{{ tr("All", "全部") }}</option>
+            <option value="SFW">{{ tr("SFW only", "仅非 18+") }}</option>
+            <option value="NSFW">{{ tr("18+ only", "仅 18+") }}</option>
           </select>
         </label>
 
         <label class="repo-select">
-          <span>Language</span>
+          <span>{{ tr("Language", "语言") }}</span>
           <select v-model="languageFilter">
-            <option value="ALL">All languages</option>
+            <option value="ALL">{{ tr("All languages", "所有语言") }}</option>
             <option v-for="language in languageOptions" :key="language" :value="language">
-              {{ language }}
+              {{ languageLabel(language) }}
             </option>
           </select>
         </label>
       </div>
     </div>
 
-    <div class="repo-toolbar" aria-label="Repository type filter">
+    <div class="repo-toolbar" :aria-label="tr('Repository type filter', '仓库类型筛选')">
       <button
         v-for="chip in kindChips"
         :key="chip.kind"
@@ -246,16 +302,17 @@ async function copyUrl(repo: RepoEntry) {
     </div>
 
     <p class="repo-summary">
-      Showing <strong>{{ visibleCount }}</strong> repositories
-      <template v-if="activeKind !== 'ALL'"> in {{ kindLabels[activeKind] ?? activeKind }}</template>
-      <template v-if="typeFilter !== 'ALL'"> · {{ typeLabels[typeFilter] }}</template>
-      <template v-if="nsfwFilter !== 'ALL'"> · {{ nsfwFilter }}</template>
-      <template v-if="languageFilter !== 'ALL'"> · {{ languageFilter }}</template>
-      <template v-if="query.trim()"> · matching “{{ query.trim() }}”</template>
+      {{ tr("Showing", "显示") }} <strong>{{ visibleCount }}</strong>
+      {{ tr("repositories", "个仓库") }}
+      <template v-if="activeKind !== 'ALL'"> · {{ kindLabel(activeKind) }}</template>
+      <template v-if="typeFilter !== 'ALL'"> · {{ typeLabel(typeFilter) }}</template>
+      <template v-if="nsfwFilter !== 'ALL'"> · {{ nsfwFilter === "NSFW" ? "18+" : tr("SFW", "非 18+") }}</template>
+      <template v-if="languageFilter !== 'ALL'"> · {{ languageLabel(languageFilter) }}</template>
+      <template v-if="query.trim()"> · {{ tr("matching", "匹配") }} “{{ query.trim() }}”</template>
     </p>
 
     <p v-if="visibleCount === 0" class="repo-empty">
-      No repositories match the current filters.
+      {{ tr("No repositories match the current filters.", "没有符合当前条件的仓库。") }}
     </p>
 
     <section v-for="group in visibleGroups" :key="group.kind" class="repo-section">
@@ -277,10 +334,10 @@ async function copyUrl(repo: RepoEntry) {
 
           <div class="repo-meta">
             <span v-for="type in repo.contentTypes" :key="type" class="repo-meta-tag">
-              {{ typeLabels[type] ?? type }}
+              {{ typeLabel(type) }}
             </span>
             <span v-for="language in repo.languages" :key="language" class="repo-meta-tag language">
-              {{ language }}
+              {{ languageLabel(language) }}
             </span>
           </div>
 
@@ -294,12 +351,12 @@ async function copyUrl(repo: RepoEntry) {
               :class="{ copied: copiedKey === repoKey(repo) }"
               @click="copyUrl(repo)"
             >
-              {{ copiedKey === repoKey(repo) ? "Copied" : "Copy" }}
+              {{ copiedKey === repoKey(repo) ? tr("Copied", "已复制") : tr("Copy", "复制") }}
             </button>
           </div>
 
           <div class="repo-actions">
-            <a class="install-button" :href="installHref(repo)">Install</a>
+            <a class="install-button" :href="installHref(repo)">{{ tr("Install", "安装") }}</a>
           </div>
         </article>
       </div>
