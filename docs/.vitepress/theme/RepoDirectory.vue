@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useData } from "vitepress";
+import { lang, isZh, tr } from "./i18n";
 import { repos, type RepoEntry } from "../repo-catalog";
-
-const { lang } = useData();
-const isZh = computed(() => lang.value.startsWith("zh"));
 
 const kindOrder = [
   "JAR",
@@ -90,10 +87,6 @@ const typeFilter = ref<string>("ALL");
 const nsfwFilter = ref<string>("ALL");
 const languageFilter = ref<string>("ALL");
 const copiedKey = ref<string | null>(null);
-
-function tr(en: string, zh: string): string {
-  return isZh.value ? zh : en;
-}
 
 function kindLabel(kind: string): string {
   return isZh.value ? (kindLabelsZh[kind] ?? kind) : (kindLabelsEn[kind] ?? kind);
